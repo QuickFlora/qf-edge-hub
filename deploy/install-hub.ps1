@@ -44,11 +44,13 @@ New-Item -ItemType Directory -Force $Root | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $Root 'bin') | Out-Null
 New-Item -ItemType Directory -Force (Join-Path $Root 'App_Data\Logs') | Out-Null
 $oldCfg = Join-Path $Root 'web.config'
-$oldConn = $null; $oldKey = $null
+$oldConn = $null; $oldKey = $null; $oldPsUrl = $null; $oldPsHost = $null
 if (Test-Path $oldCfg) {
   $x = [xml](Get-Content $oldCfg)
   $oldConn = ($x.configuration.appSettings.add | Where-Object { $_.key -eq 'ConnectionString' }).value
   $oldKey = ($x.configuration.appSettings.add | Where-Object { $_.key -eq 'HubKey' }).value
+  $oldPsUrl = ($x.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceUrl' }).value
+  $oldPsHost = ($x.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceHost' }).value
 }
 Copy-Item (Join-Path $src.FullName 'site\*') $Root -Recurse -Force
 Copy-Item (Join-Path $src.FullName 'bin\*.dll') (Join-Path $Root 'bin') -Force
@@ -65,10 +67,18 @@ if (-not $conn) { throw 'no ConnectionString found' }
 $conn = $conn -replace 'Application Name=[^;]*', 'Application Name=qf-edge-hub'
 ($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'ConnectionString' }).value = $conn
 if ($oldKey) { ($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'HubKey' }).value = $oldKey }
-if ($PrintServiceUrl) { ($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceUrl' }).value = $PrintServiceUrl }
-if ($PrintServiceHost) { ($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceHost' }).value = $PrintServiceHost }
+# the print web service is reached on the loopback with the site's own Host header: a server cannot
+# reach its public DNS name from inside AWS (hairpin), seen on WEB1TEST 2026-10-18
+if (-not $PrintServiceUrl) { $PrintServiceUrl = $oldPsUrl }
+if (-not $PrintServiceHost) { $PrintServiceHost = $oldPsHost }
+$site = Get-Website $SiteName
+$hostName = ($site.bindings.Collection | Where-Object { $_.protocol -eq 'http' -and $_.bindingInformation -like '*:80:*' } | ForEach-Object { $_.bindingInformation.Split(':')[2] } | Where-Object { $_ } | Select-Object -Last 1)
+if (-not $PrintServiceUrl) { $PrintServiceUrl = 'http://127.0.0.1/NewQFPrintWebService/QFPrintService.asmx' }
+if (-not $PrintServiceHost -and $hostName) { $PrintServiceHost = $hostName }
+($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceUrl' }).value = $PrintServiceUrl
+($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceHost' }).value = $PrintServiceHost
 $cfg.Save((Join-Path $Root 'web.config'))
-"   PrintServiceUrl = " + ($cfg.configuration.appSettings.add | Where-Object { $_.key -eq 'PrintServiceUrl' }).value
+"   PrintServiceUrl = $PrintServiceUrl  (Host: $PrintServiceHost)"
 
 "4. IIS"
 if (-not (Test-Path "IIS:\AppPools\$PoolName")) {
@@ -98,11 +108,9 @@ Restart-WebAppPool $PoolName
 Start-Sleep -Seconds 3
 
 "5. health"
-$site = Get-Website $SiteName
-$hostName = ($site.bindings.Collection | Where-Object { $_.protocol -eq 'https' } | Select-Object -First 1).bindingInformation.Split(':')[2]
-if (-not $hostName) { $hostName = 'localhost' }
-$url = "https://$hostName$AppPath/health.ashx"
-"   GET $url"
-try { (Invoke-WebRequest -UseBasicParsing $url -TimeoutSec 30).Content } catch { "   health failed: " + $_.Exception.Message }
+$url = "http://127.0.0.1$AppPath/health.ashx"
+"   GET $url (Host: $hostName)"
+try { (Invoke-WebRequest -UseBasicParsing $url -Headers @{Host=$hostName} -TimeoutSec 30).Content } catch { "   health failed: " + $_.Exception.Message }
+"   from outside: https://$hostName$AppPath/health.ashx"
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 "DONE"
