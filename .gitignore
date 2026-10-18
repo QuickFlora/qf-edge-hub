@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+*.suo
+site/web.config.local
+deploy/*.secret
