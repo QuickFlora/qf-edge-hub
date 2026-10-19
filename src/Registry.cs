@@ -50,6 +50,12 @@ namespace QfEdgeHub
 
         public static int ConnectionCount { get { lock (Gate) { return byConnection.Count; } } }
 
+        /// <summary>Live connections for one terminal key (0 = that PC is not on the hub right now).</summary>
+        public static int ConnectionsFor(string key)
+        {
+            lock (Gate) { int n; connectionsPerKey.TryGetValue(key, out n); return n; }
+        }
+
         public static List<Terminal> All()
         {
             lock (Gate) { return new List<Terminal>(byConnection.Values); }

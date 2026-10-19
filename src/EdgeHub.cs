@@ -13,6 +13,7 @@ namespace QfEdgeHub
     ///   Job(JobMessage)   a POSPrintProcess row ready to print (Read=1, Active=1)
     ///   Nudge(reason)     a print request exists and the hub asked the print web service to turn it into jobs
     ///   Alert(text)       a message for the screen (support use)
+    ///   Warm(reason)      someone started an order on this terminal (print web service -> signal.ashx): wake the printers
     /// The client calls Hello(appVersion) after connecting and Claimed(slno) after it stored a job.
     /// Nothing here writes to the database.
     /// </summary>
