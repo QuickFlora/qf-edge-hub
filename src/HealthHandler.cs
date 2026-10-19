@@ -18,7 +18,8 @@ namespace QfEdgeHub
             sb.AppendLine("qf-edge-hub " + typeof(HealthHandler).Assembly.GetName().Version + "  server time " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sb.AppendLine("dispatcher: " + (Dispatcher.StartedAt == DateTime.MinValue ? "idle (no terminal has connected yet)" :
                 "started " + Dispatcher.StartedAt.ToString("HH:mm:ss") + ", last tick " + Dispatcher.LastTick.ToString("HH:mm:ss") + " (" + Dispatcher.LastTickMs.ToString("0") + " ms)"));
-            sb.AppendLine("ticks " + Dispatcher.Ticks + " | jobs pushed " + Dispatcher.JobsPushed + " | nudges " + Dispatcher.Nudges + " | pings " + Dispatcher.Pings + " | db errors " + Dispatcher.DbErrors);
+            sb.AppendLine("ticks " + Dispatcher.Ticks + " | jobs pushed " + Dispatcher.JobsPushed + " | nudges " + Dispatcher.Nudges + " | pings " + Dispatcher.Pings + " | db errors " + Dispatcher.DbErrors
+                + " | warm signals " + SignalHandler.Warms + " (pushed " + SignalHandler.WarmsPushed + ")");
             if (Dispatcher.LastError.Length > 0) sb.AppendLine("last error: " + Dispatcher.LastError);
             List<Terminal> all = Registry.All();
             sb.AppendLine("connections " + all.Count);

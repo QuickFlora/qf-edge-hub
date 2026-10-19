@@ -35,6 +35,11 @@ Phone Order / POS pages  --INSERT-->  POSPrintRequest, POSPrintProcess, ... (unc
 - **Cache pull** (`site/cache.ashx`, `src/CacheHandler.cs`): `?table=Companies&c=&d=&p=&since=` for the
   print app's EdgeSync. Returns shop-facing company columns only - no keys, passwords, bank or tax IDs.
 - **Health** (`site/health.ashx`): connected terminals, tick counters, last error. Plain text.
+- **Warm signal** (`site/signal.ashx`, `src/SignalHandler.cs`): `?type=warm&c=&d=&p=&t=` called by the print web
+  service's `PrintDispatcher.SignalWarm` (repo `PrintWebServices`, appSetting `EdgeHubSignalUrl`). The hub pushes
+  `Warm` to the terminal's group and the print app (6.1.1+) runs its existing warm-up (AB#3796) - a PC in push mode
+  never polls, so the in-memory signal alone would never reach it. Reply `{"connections":N,"pushed":bool}`;
+  0 connections means the PC is long-polling and the print web service's own signal serves it.
 
 ### Feed choice: dispatcher loop, not trigger -> Service Broker
 
